@@ -1,72 +1,53 @@
 #!/usr/bin/env python
 # encoding: utf-8
 """
-untitled.py
+airplayer.py
 
 Created by Pascal Widdershoven on 2010-12-19.
+Modified by Rui Carmo on 2010-12-24
 Copyright (c) 2010 P. Widdershoven. All rights reserved.
 """
 
-import sys
-import thread
-import bonjour
-from socket import gethostname
+import sys, thread, socket, signal, BaseHTTPServer
 
-from xbmc import XBMC
-from web import Webserver
-import settings
+class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
-import signal
+  def __init__(self):
+    pass
 
 class Runner(object):
+  
+  def __init__(self, port):
+    self.port = port
+    self ip = socket.gethostbyname(socket.gethostname())
+    self.info = new bonjour.dns.ServiceInfo("_airplay._tcp", "Python", socket.inet_aton(self.ip), self.port)
+    self.bonjour = new bonjour.mdns.Bonjour()
+    self.web = None
     
-    def __init__(self, port):
-        self.port = port
-        self.xbmc = None
-        self.web = None
-        
-    def _register_bonjour(self):
-        hostname = gethostname()
-        thread.start_new_thread(bonjour.register_service, (hostname, "_airplay._tcp", self.port,))
-        
-    def _connect_to_xbmc(self):
-        username = None
-        password = None
-
-        if getattr(settings, 'XBMC_USERNAME', None) and settings.XBMC_USERNAME:
-            username = settings.XBMC_USERNAME
-
-        if getattr(settings, 'XBMC_PASSWORD', None) and settings.XBMC_PASSWORD:
-            password = settings.XBMC_PASSWORD
-
-        self.xbmc = XBMC(settings.XBMC_HOST, settings.XBMC_PORT, username, password)
-        
-    def _start_web(self):
-        self.web = Webserver(self.port)
-        self.web.xbmc = self.xbmc
-        self.web.start()
-        
-    def run(self):
-        self._register_bonjour()
-        self._connect_to_xbmc()
-        
-        self.xbmc.notify()
-        self._start_web()
+  def _start_web(self):
+    self.web = Webserver(self.port)
+    self.web.start()
     
-    def receive_signal(self, signum, stack):
-        self.web.stop()
-        self.xbmc.stop_playing()
+  def run(self):
+    self.bonjour.registerService(self.info)
+    httpd = BaseHTTPServer(('', self.port), AirPlayHandler)
+    while True: # prepare for conditional exiting
+      httpd.handle_request()
+  
+  def receive_signal(self, signum, stack):
+    self.web.stop()
+    self.xbmc.stop_playing()
 
-def main():    
-    runner = Runner(6002)
-    signal.signal(signal.SIGTERM, runner.receive_signal)
-    
-    try:
-        runner.run()
-    except Exception, e:    
-        print 'Unable to connect to XBMC at %s' % runner.xbmc._host_string()
-        print e
-        sys.exit(1)
+def main():  
+  runner = Runner(6002)
+  signal.signal(signal.SIGTERM, runner.receive_signal)
+  
+  try:
+    runner.run()
+  except Exception, e:  
+    print 'Unable to connect to XBMC at %s' % runner.xbmc._host_string()
+    print e
+    sys.exit(1)
 
 if __name__ == '__main__':
-    main()
+  main()

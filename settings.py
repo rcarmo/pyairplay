@@ -1,7 +1,0 @@
-XBMC_HOST = '127.0.0.1'
-XBMC_PORT = 8080
-
-XBMC_USERNAME = 'username'
-XBMC_PASSWORD = 'password'
-
-DEBUG = True

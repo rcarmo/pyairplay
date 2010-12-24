@@ -22,6 +22,8 @@
 
 """
 
+"""0.12-rcarmo - Changed Zeroconf to Bonjour - another API change"""
+
 """0.12 update - allow selection of binding interface
          typo fix - Thanks A. M. Kuchlingi
          removed all use of word 'Rendezvous' - this is an API change"""

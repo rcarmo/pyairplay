@@ -36,7 +36,7 @@ class Runner(object):
   def __init__(self, port):
     self.port = port
     self.ip = socket.gethostbyname(socket.gethostname())
-    self.info = mdns.ServiceInfo("_airplay._tcp.local.", "Python._airplay._tcp.local.", socket.inet_aton(self.ip), self.port, 0, 0, "", "Here.local")
+    self.info = mdns.ServiceInfo("_airplay._tcp.local.", "Python._airplay._tcp.local.", socket.inet_aton(self.ip), self.port, 0, 0, {'path':'/'}, "Here.local")
     self.bonjour = mdns.Bonjour()
     
   def run(self):

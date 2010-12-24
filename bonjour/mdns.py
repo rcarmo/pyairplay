@@ -31,10 +31,10 @@ import select
 import traceback
 import logging
 log = logging.getLogger(__name__)
-from zeroconf import dns,mcastsocket,__version__
+from bonjour import dns,mcastsocket,__version__
 
 ServiceInfo = dns.ServiceInfo
-__all__ = ["Zeroconf", "ServiceInfo", "ServiceBrowser"]
+__all__ = ["Bonjour", "ServiceInfo", "ServiceBrowser"]
 
 # hook for threads
 globals()['_GLOBAL_DONE'] = 0
@@ -58,9 +58,9 @@ class Engine(threading.Thread):
     packets.
     """
 
-    def __init__(self, zeroconf):
+    def __init__(self, bonjour):
         threading.Thread.__init__(self)
-        self.zeroconf = zeroconf
+        self.bonjour = bonjour
         self.readers = {} # maps socket to reader
         self.timeout = 5
         self.condition = threading.Condition()
@@ -122,13 +122,13 @@ class Listener(object):
 
     It requires registration with an Engine object in order to have
     the read() method called when a socket is availble for reading."""
-    def __init__(self, zeroconf):
-        self.zeroconf = zeroconf
-        self.zeroconf.engine.addReader(self, self.zeroconf.socket)
+    def __init__(self, bonjour):
+        self.bonjour = bonjour
+        self.bonjour.engine.addReader(self, self.bonjour.socket)
 
     def handle_read(self):
         try:
-            data, (addr, port) = self.zeroconf.socket.recvfrom(dns._MAX_MSG_ABSOLUTE)
+            data, (addr, port) = self.bonjour.socket.recvfrom(dns._MAX_MSG_ABSOLUTE)
         except Exception, err:
             if getattr( err, 'errno', None ) == 9: # 'Bad file descriptor' during shutdown...
                 pass
@@ -141,27 +141,27 @@ class Listener(object):
             # Always multicast responses
             #
             if port == dns._MDNS_PORT:
-                self.zeroconf.handleQuery(msg, dns._MDNS_ADDR, dns._MDNS_PORT)
+                self.bonjour.handleQuery(msg, dns._MDNS_ADDR, dns._MDNS_PORT)
             # If it's not a multicast query, reply via unicast
             #
             # and multicast
             elif port == dns._DNS_PORT:
-                self.zeroconf.handleQuery(msg, addr, port)
-                self.zeroconf.handleQuery(msg, dns._MDNS_ADDR, dns._MDNS_PORT)
+                self.bonjour.handleQuery(msg, addr, port)
+                self.bonjour.handleQuery(msg, dns._MDNS_ADDR, dns._MDNS_PORT)
             else:
                 log.error(
                     "Unknown port: %s", port
                 )
         else:
-            self.zeroconf.handleResponse(msg)
+            self.bonjour.handleResponse(msg)
 
 class Reaper(threading.Thread):
     """A Reaper is used by this module to remove cache entries that
     have expired."""
 
-    def __init__(self, zeroconf):
+    def __init__(self, bonjour):
         threading.Thread.__init__(self)
-        self.zeroconf = zeroconf
+        self.bonjour = bonjour
         self.daemon = True
         self.start()
 
@@ -170,16 +170,16 @@ class Reaper(threading.Thread):
             if globals()['_GLOBAL_DONE']:
                 return
             try:
-                self.zeroconf.wait(10 * 1000)
+                self.bonjour.wait(10 * 1000)
             except ValueError, err:
                 break
             if globals()['_GLOBAL_DONE']:
                 return
             now = dns.currentTimeMillis()
-            for record in self.zeroconf.cache.entries():
+            for record in self.bonjour.cache.entries():
                 if record.isExpired(now):
-                    self.zeroconf.updateRecord(now, record)
-                    self.zeroconf.cache.remove(record)
+                    self.bonjour.updateRecord(now, record)
+                    self.bonjour.cache.remove(record)
 
 
 class ServiceBrowser(threading.Thread):
@@ -189,10 +189,10 @@ class ServiceBrowser(threading.Thread):
     removeService() methods called when this browser
     discovers changes in the services availability."""
 
-    def __init__(self, zeroconf, type, listener):
+    def __init__(self, bonjour, type, listener):
         """Creates a browser for a specific type"""
         threading.Thread.__init__(self)
-        self.zeroconf = zeroconf
+        self.bonjour = bonjour
         self.type = type
         self.listener = listener
         self.daemon = True
@@ -203,13 +203,13 @@ class ServiceBrowser(threading.Thread):
 
         self.done = 0
 
-        self.zeroconf.addListener(self, dns.DNSQuestion(self.type, dns._TYPE_PTR, dns._CLASS_IN))
+        self.bonjour.addListener(self, dns.DNSQuestion(self.type, dns._TYPE_PTR, dns._CLASS_IN))
         self.start()
 
-    def updateRecord(self, zeroconf, now, record):
-        """Callback invoked by Zeroconf when new information arrives.
+    def updateRecord(self, bonjour, now, record):
+        """Callback invoked by Bonjour when new information arrives.
 
-        Updates information required by browser in the Zeroconf cache."""
+        Updates information required by browser in the Bonjour cache."""
         if record.type == dns._TYPE_PTR and record.name == self.type:
             expired = record.isExpired(now)
             try:
@@ -233,14 +233,14 @@ class ServiceBrowser(threading.Thread):
 
     def cancel(self):
         self.done = 1
-        self.zeroconf.notifyAll()
+        self.bonjour.notifyAll()
 
     def run(self):
         while 1:
             event = None
             now = dns.currentTimeMillis()
             if len(self.list) == 0 and self.nextTime > now:
-                self.zeroconf.wait(self.nextTime - now)
+                self.bonjour.wait(self.nextTime - now)
             if globals()['_GLOBAL_DONE'] or self.done:
                 return
             now = dns.currentTimeMillis()
@@ -251,7 +251,7 @@ class ServiceBrowser(threading.Thread):
                 for record in self.services.values():
                     if not record.isExpired(now):
                         out.addAnswerAtTime(record, now)
-                self.zeroconf.send(out)
+                self.bonjour.send(out)
                 self.nextTime = now + self.delay
                 self.delay = min(20 * 1000, self.delay * 2)
 
@@ -259,15 +259,15 @@ class ServiceBrowser(threading.Thread):
                 event = self.list.pop(0)
 
             if event is not None:
-                event(self.zeroconf)
+                event(self.bonjour)
 
-class Zeroconf(object):
-    """Implementation of Zeroconf Multicast DNS Service Discovery
+class Bonjour(object):
+    """Implementation of Bonjour Multicast DNS Service Discovery
 
     Supports registration, unregistration, queries and browsing.
     """
     def __init__(self, bindaddress=None):
-        """Creates an instance of the Zeroconf class, establishing
+        """Creates an instance of the Bonjour class, establishing
         multicast communications, listening and reaping threads."""
         globals()['_GLOBAL_DONE'] = 0
         if bindaddress is None:
@@ -334,7 +334,7 @@ class Zeroconf(object):
 
     def registerService(self, info, ttl=dns._DNS_TTL):
         """Registers service information to the network with a default TTL
-        of 60 seconds.  Zeroconf will then respond to requests for
+        of 60 seconds.  Bonjour will then respond to requests for
         information for that service.  The name of the service may be
         changed if needed to make it unique on the network."""
         self.checkService(info)

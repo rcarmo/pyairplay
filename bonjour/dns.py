@@ -902,7 +902,7 @@ class ServiceInfo(object):
         """Server accessor"""
         return self.server
 
-    def updateRecord(self, zeroconf, now, record):
+    def updateRecord(self, bonjour, now, record):
         """Updates service information from a DNS record"""
         if record is not None and not record.isExpired(now):
             if record.type == _TYPE_A:
@@ -915,12 +915,12 @@ class ServiceInfo(object):
                     self.weight = record.weight
                     self.priority = record.priority
                     self.address = None
-                    self.updateRecord(zeroconf, now, zeroconf.cache.getByDetails(self.server, _TYPE_A, _CLASS_IN))
+                    self.updateRecord(bonjour, now, bonjour.cache.getByDetails(self.server, _TYPE_A, _CLASS_IN))
             elif record.type == _TYPE_TXT:
                 if record.name == self.name:
                     self.setText(record.text)
 
-    def request(self, zeroconf, timeout):
+    def request(self, bonjour, timeout):
         """Returns true if the service could be discovered on the
         network, and updates this object with details discovered.
         """
@@ -930,28 +930,28 @@ class ServiceInfo(object):
         last = now + timeout
         result = 0
         try:
-            zeroconf.addListener(self, DNSQuestion(self.name, _TYPE_ANY, _CLASS_IN))
+            bonjour.addListener(self, DNSQuestion(self.name, _TYPE_ANY, _CLASS_IN))
             while self.server is None or self.address is None or self.text is None:
                 if last <= now:
                     return 0
                 if next <= now:
                     out = DNSOutgoing(_FLAGS_QR_QUERY)
                     out.addQuestion(DNSQuestion(self.name, _TYPE_SRV, _CLASS_IN))
-                    out.addAnswerAtTime(zeroconf.cache.getByDetails(self.name, _TYPE_SRV, _CLASS_IN), now)
+                    out.addAnswerAtTime(bonjour.cache.getByDetails(self.name, _TYPE_SRV, _CLASS_IN), now)
                     out.addQuestion(DNSQuestion(self.name, _TYPE_TXT, _CLASS_IN))
-                    out.addAnswerAtTime(zeroconf.cache.getByDetails(self.name, _TYPE_TXT, _CLASS_IN), now)
+                    out.addAnswerAtTime(bonjour.cache.getByDetails(self.name, _TYPE_TXT, _CLASS_IN), now)
                     if self.server is not None:
                         out.addQuestion(DNSQuestion(self.server, _TYPE_A, _CLASS_IN))
-                        out.addAnswerAtTime(zeroconf.cache.getByDetails(self.server, _TYPE_A, _CLASS_IN), now)
-                    zeroconf.send(out)
+                        out.addAnswerAtTime(bonjour.cache.getByDetails(self.server, _TYPE_A, _CLASS_IN), now)
+                    bonjour.send(out)
                     next = now + delay
                     delay = delay * 2
 
-                zeroconf.wait(min(next, last) - now)
+                bonjour.wait(min(next, last) - now)
                 now = currentTimeMillis()
             result = 1
         finally:
-            zeroconf.removeListener(self)
+            bonjour.removeListener(self)
 
         return result
 

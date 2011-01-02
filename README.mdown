@@ -1,1 +1,5 @@
 This is a fork of XBMC AirPlayer to fool around with the AirPlay protocol basics on a baseline Python install.
+
+My main goal here is to understand the protocol and implement a working server using pure Python and the least possible amount of extra libraries.
+
+As a little experiment, I'm also using this to control a WDTVLive device (a UPNP-enabled media extender), although this is far from usable right now.

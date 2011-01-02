@@ -3,9 +3,9 @@
 """
 airplayer.py
 
-Created by Pascal Widdershoven on 2010-12-19.
-Modified by Rui Carmo on 2010-12-24
-Copyright (c) 2010 P. Widdershoven. All rights reserved.
+Original concept by Pascal Widdershoven on 2010-12-19.
+Wantonly modified by Rui Carmo on 2010-12-24 until it bore no resemblance whatsoever
+to the original source code.
 """
 
 import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib

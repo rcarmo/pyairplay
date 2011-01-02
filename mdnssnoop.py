@@ -27,7 +27,7 @@ if __name__ == '__main__':
     r = Bonjour()
     try:
         print "1. Testing browsing for a service..."
-        type = "_ssh._tcp.local."
+        type = "_airplay._tcp.local."
         listener = MyListener()
         browser = ServiceBrowser(r, type, listener)
         raw_input( 'Press <enter> to stop listening > ')

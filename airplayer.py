@@ -11,25 +11,71 @@ Copyright (c) 2010 P. Widdershoven. All rights reserved.
 import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging
 from bonjour import mdns
 
-
 log = logging.getLogger('bonjour.dns')
+log.setLevel(logging.DEBUG)
 h = logging.StreamHandler()
 h.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 log.addHandler(h)
-log.setLevel(logging.debug)
+
+def AirPlayCommand(command):
+  def wrapper(r):
+    log.debug(r.request_version)
+    log.debug(r.command)
+    log.debug(r.headers)
+    if 'Content-Length' in r.headers:
+      bytes = r.headers['Content-Length']
+      if bytes:
+        r.body = r.rfile.read(int(bytes))
+      try:
+        lines = r.body.split('\n')
+        for l in lines:
+          (header, value) = l.split(': ',2)
+          r.info[header] = value
+      except:
+        pass
+      log.debug(r.body)
+    command(r)
+  return wrapper
 
 class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-  def do_GET(self):
+  def do_POST(self):
+    self.body = ''
+    self.info = {}
     path = urlparse.urlparse(self.path)
-    log.info("Got %s" % self.path)
-    result = {
-      "/reverse": self.cmd_reverse,
-      "/play": self.cmd_play, 
-      "/scrub": self.cmd_scrub,
-      "/rate": self.cmd_rate,
-      "/photo": self.cmd_photo,
-      "/stop": self.cmd_stop
-    }[path]
+    getattr(self,self.path[1:])()
+
+  @AirPlayCommand
+  def reverse(self):
+    self.send_response(101)
+    self.send_header('Upgrade', 'PTTH/1.0')
+    self.send_header('Connection', 'Upgrade')
+    self.end_headers()
+
+  @AirPlayCommand
+  def play(self):
+    log.info(self.info)
+    self.send_response(200)
+
+  @AirPlayCommand
+  def stop(self):
+    pass
+
+  @AirPlayCommand
+  def photo(self):
+    pass
+
+  @AirPlayCommand
+  def scrub(self):
+    pass
+
+  @AirPlayCommand
+  def rate(self):
+    pass
+
+  @AirPlayCommand
+  def authorize(self):
+    pass
+
     
 class Runner(object):
   

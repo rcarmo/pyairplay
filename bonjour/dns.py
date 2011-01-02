@@ -779,6 +779,7 @@ class ServiceInfo(object):
         """Create a service description.
 
         type: fully qualified service type name
+        subtype: fully qualified service type name
         name: fully qualified service name
         address: IP address as unsigned short, network byte order
         port: port that the service runs on

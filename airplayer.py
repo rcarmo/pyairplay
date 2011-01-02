@@ -8,7 +8,7 @@ Modified by Rui Carmo on 2010-12-24
 Copyright (c) 2010 P. Widdershoven. All rights reserved.
 """
 
-import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging
+import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib
 from bonjour import mdns
 
 log = logging.getLogger('bonjour.dns')
@@ -16,6 +16,43 @@ log.setLevel(logging.DEBUG)
 h = logging.StreamHandler()
 h.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 log.addHandler(h)
+
+def UPNPCommand(url):
+  conn = httplib.HTTPConnection("192.168.1.76:52932") # my WDTVLive
+  headers = {'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI"'}
+  request = """<?xml version="1.0" encoding="utf-8"?>
+  <s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+    <s:Body>
+      <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+        <InstanceID>0</InstanceID>
+        <CurrentURI>%(url)s</CurrentURI>
+        <CurrentURIMetaData />
+      </u:SetAVTransportURI>
+    </s:Body>
+  </s:Envelope>""" % locals()
+  conn.request("POST", "/MediaRenderer_AVTransport/control", request, headers)
+  response = conn.getresponse()
+  log.info(response.status)
+  log.info(response.read())
+  conn.close()
+
+  conn = httplib.HTTPConnection("192.168.1.76:52932") # my WDTVLive
+  headers = {'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#Play"'}
+  request = """<?xml version="1.0" encoding="utf-8"?>
+  <s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+    <s:Body>
+      <u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+        <InstanceID>0</InstanceID>
+        <Speed>1</Speed>
+      </u:Play>
+    </s:Body>
+  </s:Envelope>""" 
+  conn.request("POST", "/MediaRenderer_AVTransport/control", request, headers)
+  response = conn.getresponse()
+  log.info(response.status)
+  log.info(response.read())
+  conn.close()
+  
 
 def AirPlayCommand(command):
   def wrapper(r):
@@ -54,6 +91,7 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   @AirPlayCommand
   def play(self):
     log.info(self.info)
+    UPNPCommand(self.info['Content-Location'])
     self.send_response(200)
 
   @AirPlayCommand

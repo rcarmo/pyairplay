@@ -10,49 +10,13 @@ to the original source code.
 
 import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib
 from bonjour import mdns
+import upnp
 
 log = logging.getLogger('bonjour.dns')
 log.setLevel(logging.DEBUG)
 h = logging.StreamHandler()
 h.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 log.addHandler(h)
-
-def UPNPCommand(url):
-  conn = httplib.HTTPConnection("192.168.1.76:52932") # my WDTVLive
-  headers = {'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI"'}
-  request = """<?xml version="1.0" encoding="utf-8"?>
-  <s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-    <s:Body>
-      <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-        <InstanceID>0</InstanceID>
-        <CurrentURI>%(url)s</CurrentURI>
-        <CurrentURIMetaData />
-      </u:SetAVTransportURI>
-    </s:Body>
-  </s:Envelope>""" % locals()
-  conn.request("POST", "/MediaRenderer_AVTransport/control", request, headers)
-  response = conn.getresponse()
-  log.info(response.status)
-  log.info(response.read())
-  conn.close()
-
-  conn = httplib.HTTPConnection("192.168.1.76:52932") # my WDTVLive
-  headers = {'SOAPACTION': '"urn:schemas-upnp-org:service:AVTransport:1#Play"'}
-  request = """<?xml version="1.0" encoding="utf-8"?>
-  <s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-    <s:Body>
-      <u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-        <InstanceID>0</InstanceID>
-        <Speed>1</Speed>
-      </u:Play>
-    </s:Body>
-  </s:Envelope>""" 
-  conn.request("POST", "/MediaRenderer_AVTransport/control", request, headers)
-  response = conn.getresponse()
-  log.info(response.status)
-  log.info(response.read())
-  conn.close()
-  
 
 def AirPlayCommand(command):
   def wrapper(r):
@@ -91,7 +55,7 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   @AirPlayCommand
   def play(self):
     log.info(self.info)
-    UPNPCommand(self.info['Content-Location'])
+    self.upnpdevice.play(self.info['Content-Location'])
     self.send_response(200)
 
   @AirPlayCommand
@@ -117,8 +81,9 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     
 class Runner(object):
   
-  def __init__(self, port):
+  def __init__(self, upnpdevice, port):
     self.port = port
+    self.upnpdevice = upnpdevice
     self.ip = socket.gethostbyname(socket.gethostname())
     self.info = mdns.ServiceInfo("_airplay._tcp.local.", "Python._airplay._tcp.local.", socket.inet_aton(self.ip), self.port, 0, 0, {'path':'/'}, "Here.local")
     self.bonjour = mdns.Bonjour()
@@ -126,6 +91,7 @@ class Runner(object):
   def run(self):
     self.bonjour.registerService(self.info)
     httpd = BaseHTTPServer.HTTPServer(('', self.port), AirPlayHandler)
+    httpd.upnpdevice = self.upnpdevice
     try:
       httpd.serve_forever()
     except KeyboardInterrupt:
@@ -134,8 +100,8 @@ class Runner(object):
   def receive_signal(self, signum, stack):
     self.bonjour.close()
 
-def main():  
-  runner = Runner(6002)
+def main(upnpdevice):  
+  runner = Runner(upnpdevice, 6002)
   signal.signal(signal.SIGTERM, runner.receive_signal)
   try:
     runner.run()
@@ -144,4 +110,4 @@ def main():
     sys.exit(1)
 
 if __name__ == '__main__':
-  main()
+  main(UPNPDevice("192.168.1.76:52932"))

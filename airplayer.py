@@ -110,4 +110,4 @@ def main(upnpdevice):
     sys.exit(1)
 
 if __name__ == '__main__':
-  main(UPNPDevice("192.168.1.76:52932"))
+  main(upnp.UPNPDevice("192.168.1.76:52932"))

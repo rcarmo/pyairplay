@@ -36,12 +36,7 @@ commands = {
       <Speed>1</Speed>
     </u:Play>
   </s:Body>
-</s:Envelope>""" }
-
-def UPNPTransaction(command):
-  def wrapper(r):
-    command(r)
-  return wrapper
+</s:Envelope>""" }}
 
 class UPNPDevice:
   def __init__(self, address):

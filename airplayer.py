@@ -8,7 +8,7 @@ Wantonly modified by Rui Carmo on 2010-12-24 until it bore no resemblance whatso
 to the original source code.
 """
 
-import sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib
+import os, sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib
 from bonjour import mdns
 import upnp
 
@@ -17,6 +17,8 @@ log.setLevel(logging.DEBUG)
 h = logging.StreamHandler()
 h.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 log.addHandler(h)
+
+photobuffer = ''
 
 def AirPlayCommand(command):
   def wrapper(r):
@@ -27,25 +29,52 @@ def AirPlayCommand(command):
       bytes = r.headers['Content-Length']
       if bytes:
         r.body = r.rfile.read(int(bytes))
+      try:
+        lines = r.body.split('\n')
+        for l in lines:
+          (header, value) = l.split(': ',2)
+          r.info[header] = value
+        log.debug(r.info)
+      except:
+        pass
+    command(r)
+  return wrapper
+
+def HTTPCommand(command):
+  def wrapper(r):
+    (r.schema,r.netloc,r.path,r.parameters,r.query,r.fragment) = urlparse.urlparse(urllib.unquote(r.path))
     command(r)
   return wrapper
 
 class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+
+  @HTTPCommand
   def do_GET(self):
-    path = urlparse.urlparse(self.path)
-    getattr(self,self.path[1:])()    
+    getattr(self,(self.path[1:].split('/')[0]))()    
   
+  @HTTPCommand
+  def do_HEAD(self):
+    if 'getcontentFeatures.dlna.org' in self.headers:
+      log.info("Replying to HEAD command")
+      self.send_header('TransferMode.DLNA.ORG', 'Streaming')
+      self.send_header('ContentFeatures.DLNA.ORG', 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000')
+      self.send_header('Last-Modified', self.date_time_string())
+      self.send_header('Content-Length', str(len(photobuffer)))
+      self.send_header('Content-Type', 'image/jpeg')
+      self.send_response(200)
+      self.end_headers()
+  
+  @HTTPCommand
   def do_PUT(self):
     self.body = ''
     self.info = {}
-    path = urlparse.urlparse(self.path)
-    getattr(self,self.path[1:])()
+    getattr(self,(self.path[1:].split('/')[0]))()    
   
+  @HTTPCommand
   def do_POST(self):
     self.body = ''
     self.info = {}
-    path = urlparse.urlparse(self.path)
-    getattr(self,self.path[1:])()
+    getattr(self,(self.path[1:].split('/')[0]))()    
 
   @AirPlayCommand
   def reverse(self):
@@ -69,8 +98,9 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def photo(self):
     self.send_response(200)
     self.end_headers()
-    self.buffer = self.body
-    self.upnpdevice.play('http://%s:%d/upnpviewimage' % (self.server.server_address[0],self.server.server_address[1]))
+    photobuffer = self.body
+    print len(photobuffer)
+    self.upnpdevice.play('http://%s:%d/upnpviewimage/photobuffer.jpg' % (self.server.server_address[0],self.server.server_address[1]))
 
   @AirPlayCommand
   def scrub(self):
@@ -84,11 +114,15 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def authorize(self):
     pass
 
+  @AirPlayCommand
   def upnpviewimage(self):
+    print len(buffer)
     self.send_response(200)
     self.send_header('Content-Type', 'image/jpeg')
+    self.send_header('getcontentFeatures.dlna.org', '1')
+    self.send_header('Content-Length', str(len(photobuffer)))
     self.end_headers()
-    self.wfile.write(self.buffer)
+    self.wfile.write(photobuffer)
     
 class Runner(object):
   

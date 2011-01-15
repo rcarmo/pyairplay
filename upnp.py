@@ -38,7 +38,9 @@ commands = {
   </s:Body>
 </s:Envelope>""" } }
 
+
 def rawPost(address, uri, headers, data):
+  """Need to do this because urllib and httplib mangle HTTP header case and the Intel UPNP daemons are case-sensitive."""
   (host, port) = address.split(':')
   s =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.connect((host, int(port)))

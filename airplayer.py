@@ -51,7 +51,24 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   @HTTPCommand
   def do_GET(self):
     getattr(self,(self.path[1:].split('/')[0]))()    
-  
+  """
+  --- TV’s request
+  HEAD /get/0$1$0$12/video.mpg HTTP/1.1
+  getcontentFeatures.dlna.org: 1
+  Pragma: getIfoFileURI.dlna.org
+  transferMode.dlna.org: Streaming
+  Host: 192.168.1.102:5001
+
+  --- PMS response
+  HTTP/1.1 200 OK
+  Content-Type: video/mpeg
+  Accept-Ranges: bytes
+  Connection: keep-alive
+  ContentFeatures.DLNA.ORG: DLNA.ORG_PN=MPEG_PS_PAL;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000
+  TransferMode.DLNA.ORG: Streaming
+  Server: Windows_XP-x86-5.1, UPnP/1.0, PMS/1.20
+  Content-Length: 225261572
+  """
   @HTTPCommand
   def do_HEAD(self):
     if 'getcontentFeatures.dlna.org' in self.headers:

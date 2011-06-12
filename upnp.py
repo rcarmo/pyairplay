@@ -8,7 +8,7 @@ Poor man's UPNP controller
 Created by Rui Carmo on 2011-01-09
 """
 
-import socket, logging, cgi
+import sys, socket, logging, cgi
 
 log = logging.getLogger('upnp')
 
@@ -63,3 +63,7 @@ class UPNPDevice:
     for command in ['SetAVTransportURI', 'Play']:
       print rawPost(self.address, self.uri, commands[command]['headers'], commands[command]['body'] % locals())
       #self.conn.request("POST", self.uri, commands[command]['body'] % locals(), commands[command]['headers']).close()
+
+if __name__=='__main__':
+    d = UPNPDevice('192.168.1.76:52855')
+    d.play(sys.argv[1])

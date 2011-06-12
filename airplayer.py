@@ -10,9 +10,9 @@ to the original source code.
 
 import os, sys, thread, socket, signal, BaseHTTPServer, urlparse, logging, httplib, urllib
 from bonjour import mdns
-import upnp
+import upnp, appletv
 
-log = logging.getLogger('bonjour.dns')
+log = logging.getLogger('airplayer')
 log.setLevel(logging.DEBUG)
 h = logging.StreamHandler()
 h.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
@@ -25,6 +25,9 @@ def AirPlayCommand(command):
     log.debug(r.request_version)
     log.debug(r.command)
     log.debug(r.headers)
+    print r.headers
+    if 'X-Apple-Session-ID' in r.headers:
+        r.send_header('X-Apple-Session-ID', r.headers['X-Apple-Session-ID'])
     if 'Content-Length' in r.headers:
       bytes = r.headers['Content-Length']
       if bytes:
@@ -50,7 +53,7 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   @HTTPCommand
   def do_GET(self):
-    getattr(self,(self.path[1:].split('/')[0]))()    
+    getattr(self,(self.path[1:].split('/')[0]).replace('-','_'))()
   """
   --- TV’s request
   HEAD /get/0$1$0$12/video.mpg HTTP/1.1
@@ -126,6 +129,13 @@ class AirPlayHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   @AirPlayCommand
   def rate(self):
     pass
+    
+  @AirPlayCommand
+  def server_info(self):
+    print self.info
+    self.send_header('Content-Type', 'text/x-apple-plist+xml')
+    self.body = appletv.SERVER_INFO
+    pass
 
   @AirPlayCommand
   def authorize(self):
@@ -173,4 +183,4 @@ def main(upnpdevice):
     sys.exit(1)
 
 if __name__ == '__main__':
-  main(upnp.UPNPDevice("192.168.1.76:52932")) # TODO: UPNP autodetection
+  main(upnp.UPNPDevice("192.168.1.76:52855")) # TODO: UPNP autodetection
